@@ -1,0 +1,401 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import csv\n",
+    "import pandas as pd\n",
+    "import numpy as np"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# based on the problem outlined, we only need to worry about a selection of the columns in this data\n",
+    "# these variables are just helpers that I refer to during the processing\n",
+    "care_about = ['YEAR','COMMODITY_DESC','COUNTY_CODE', 'COUNTY_NAME','STATE_ALPHA','STATE_NAME','STATISTICCAT_DESC','VALUE']\n",
+    "group_on = ['YEAR','COMMODITY_DESC','COUNTY_CODE', 'COUNTY_NAME','STATE_ALPHA','STATE_NAME','STATISTICCAT_DESC']"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "starting...\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "/Users/dtsal/anaconda3/lib/python3.7/site-packages/ipykernel_launcher.py:8: FutureWarning: convert_objects is deprecated.  To re-infer data dtypes for object columns, use Series.infer_objects()\n",
+      "For all other conversions use the data-type specific converters pd.to_datetime, pd.to_timedelta and pd.to_numeric.\n",
+      "  \n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "1000000\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "/Users/dtsal/anaconda3/lib/python3.7/site-packages/IPython/core/interactiveshell.py:3049: DtypeWarning: Columns (21,22,38) have mixed types. Specify dtype option on import or set low_memory=False.\n",
+      "  interactivity=interactivity, compiler=compiler, result=result)\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "2000000\n",
+      "3000000\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "/Users/dtsal/anaconda3/lib/python3.7/site-packages/IPython/core/interactiveshell.py:3049: DtypeWarning: Columns (21,22,25,38) have mixed types. Specify dtype option on import or set low_memory=False.\n",
+      "  interactivity=interactivity, compiler=compiler, result=result)\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "4000000\n",
+      "5000000\n",
+      "6000000\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "/Users/dtsal/anaconda3/lib/python3.7/site-packages/IPython/core/interactiveshell.py:3049: DtypeWarning: Columns (18,21,22,37,38) have mixed types. Specify dtype option on import or set low_memory=False.\n",
+      "  interactivity=interactivity, compiler=compiler, result=result)\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "7000000\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "/Users/dtsal/anaconda3/lib/python3.7/site-packages/IPython/core/interactiveshell.py:3049: DtypeWarning: Columns (18,21,22,25,35,38) have mixed types. Specify dtype option on import or set low_memory=False.\n",
+      "  interactivity=interactivity, compiler=compiler, result=result)\n"
+     ]
+    }
+   ],
+   "source": [
+    "# because the txt file is so large, my computer needs to process it in chunks\n",
+    "# we are using a deprecated function still, hence the warnings\n",
+    "chunksize = 10 ** 6  # number of rows per chunk\n",
+    "rows_processed = 0 # keeping track of progress\n",
+    "overall_df = None # make sure there is no data from a previous run\n",
+    "print('starting...')\n",
+    "for chunk in pd.read_csv('qs.crops_20200505.txt', chunksize=chunksize, sep='\\t'):\n",
+    "    chunk.VALUE.replace(['(D)'], [0], inplace=True) # replace data that wasn't reported with 0's so we can do math later\n",
+    "    chunk['VALUE'] = chunk['VALUE'].convert_objects(convert_numeric= True) # force a datatype we want\n",
+    "    chunk[['COUNTY_CODE','COUNTY_NAME']] = chunk[['COUNTY_CODE','COUNTY_NAME']].fillna(value='Missing County') # similarly get rid of missing data\n",
+    "    output = chunk[care_about].groupby(group_on).sum().reset_index() # aggregate the data we actually want to keep defined above\n",
+    "    rows_processed += 10** 6 # keep track of progress\n",
+    "    if overall_df is None: #either start a dataframe, or add the processed rows to the existing one\n",
+    "        overall_df = pd.DataFrame(output)\n",
+    "    else:\n",
+    "        overall_df = overall_df.append(pd.DataFrame(output))\n",
+    "    print(rows_processed)\n",
+    "        "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 149,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# save that progress so we don't need to do it again in the future\n",
+    "overall_df.to_csv('partially_processed.csv')\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "overall_df = pd.read_csv('partially_processed.csv')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# limit the data to the date range and crop variety we are interested in studying\n",
+    "filtered = overall_df.loc[(overall_df.YEAR >= 1990) & (overall_df['COMMODITY_DESC'].isin(['CORN','SOYBEANS','WHEAT', 'COTTON', 'RICE']))]\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 13,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "/Users/dtsal/anaconda3/lib/python3.7/site-packages/ipykernel_launcher.py:1: SettingWithCopyWarning: \n",
+      "A value is trying to be set on a copy of a slice from a DataFrame.\n",
+      "Try using .loc[row_indexer,col_indexer] = value instead\n",
+      "\n",
+      "See the caveats in the documentation: http://pandas.pydata.org/pandas-docs/stable/indexing.html#indexing-view-versus-copy\n",
+      "  \"\"\"Entry point for launching an IPython kernel.\n",
+      "/Users/dtsal/anaconda3/lib/python3.7/site-packages/ipykernel_launcher.py:2: SettingWithCopyWarning: \n",
+      "A value is trying to be set on a copy of a slice from a DataFrame.\n",
+      "Try using .loc[row_indexer,col_indexer] = value instead\n",
+      "\n",
+      "See the caveats in the documentation: http://pandas.pydata.org/pandas-docs/stable/indexing.html#indexing-view-versus-copy\n",
+      "  \n",
+      "/Users/dtsal/anaconda3/lib/python3.7/site-packages/ipykernel_launcher.py:3: SettingWithCopyWarning: \n",
+      "A value is trying to be set on a copy of a slice from a DataFrame.\n",
+      "Try using .loc[row_indexer,col_indexer] = value instead\n",
+      "\n",
+      "See the caveats in the documentation: http://pandas.pydata.org/pandas-docs/stable/indexing.html#indexing-view-versus-copy\n",
+      "  This is separate from the ipykernel package so we can avoid doing imports until\n",
+      "/Users/dtsal/anaconda3/lib/python3.7/site-packages/ipykernel_launcher.py:4: SettingWithCopyWarning: \n",
+      "A value is trying to be set on a copy of a slice from a DataFrame.\n",
+      "Try using .loc[row_indexer,col_indexer] = value instead\n",
+      "\n",
+      "See the caveats in the documentation: http://pandas.pydata.org/pandas-docs/stable/indexing.html#indexing-view-versus-copy\n",
+      "  after removing the cwd from sys.path.\n"
+     ]
+    }
+   ],
+   "source": [
+    "# explode the statistical category column into our metrics of interest\n",
+    "filtered['AREA_PLANTED'] = filtered.apply(lambda x: x['VALUE'] if x['STATISTICCAT_DESC'] in ('AREA PLANTED', 'AREA PLANTED, NET') else 0, axis=1)\n",
+    "filtered['AREA_HARVESTED'] = filtered.apply(lambda x: x['VALUE'] if x['STATISTICCAT_DESC'] == 'AREA HARVESTED' else 0, axis=1)\n",
+    "filtered['YIELD'] = filtered.apply(lambda x: x['VALUE'] if x['STATISTICCAT_DESC'] == 'YIELD' else 0, axis=1)\n",
+    "filtered['PRODUCTION'] = filtered.apply(lambda x: x['VALUE'] if x['STATISTICCAT_DESC'] == 'PRODUCTION' else 0, axis=1)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# remove the columns we no longer need and aggregate the metrics into one row per year and county combination\n",
+    "final_columns = ['YEAR','COMMODITY_DESC','COUNTY_CODE', 'COUNTY_NAME','STATE_ALPHA','STATE_NAME', 'AREA_PLANTED', 'AREA_HARVESTED', 'YIELD', 'PRODUCTION']\n",
+    "new_grouping = ['YEAR','COMMODITY_DESC','COUNTY_CODE', 'COUNTY_NAME','STATE_ALPHA','STATE_NAME']\n",
+    "processed_data = filtered[final_columns].groupby(new_grouping, as_index=False).sum()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 15,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>YEAR</th>\n",
+       "      <th>COMMODITY_DESC</th>\n",
+       "      <th>COUNTY_CODE</th>\n",
+       "      <th>COUNTY_NAME</th>\n",
+       "      <th>STATE_ALPHA</th>\n",
+       "      <th>STATE_NAME</th>\n",
+       "      <th>AREA_PLANTED</th>\n",
+       "      <th>AREA_HARVESTED</th>\n",
+       "      <th>YIELD</th>\n",
+       "      <th>PRODUCTION</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>1990</td>\n",
+       "      <td>CORN</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>ACADIA</td>\n",
+       "      <td>LA</td>\n",
+       "      <td>LOUISIANA</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>110.0</td>\n",
+       "      <td>0.0</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>1990</td>\n",
+       "      <td>CORN</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>ACCOMACK</td>\n",
+       "      <td>VA</td>\n",
+       "      <td>VIRGINIA</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>118.0</td>\n",
+       "      <td>0.0</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>1990</td>\n",
+       "      <td>CORN</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>ADA</td>\n",
+       "      <td>ID</td>\n",
+       "      <td>IDAHO</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>165.3</td>\n",
+       "      <td>0.0</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>1990</td>\n",
+       "      <td>CORN</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>ADAIR</td>\n",
+       "      <td>IA</td>\n",
+       "      <td>IOWA</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>129.3</td>\n",
+       "      <td>0.0</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>1990</td>\n",
+       "      <td>CORN</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>ADAIR</td>\n",
+       "      <td>KY</td>\n",
+       "      <td>KENTUCKY</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>81.0</td>\n",
+       "      <td>0.0</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "   YEAR COMMODITY_DESC COUNTY_CODE COUNTY_NAME STATE_ALPHA STATE_NAME  \\\n",
+       "0  1990           CORN         1.0      ACADIA          LA  LOUISIANA   \n",
+       "1  1990           CORN         1.0    ACCOMACK          VA   VIRGINIA   \n",
+       "2  1990           CORN         1.0         ADA          ID      IDAHO   \n",
+       "3  1990           CORN         1.0       ADAIR          IA       IOWA   \n",
+       "4  1990           CORN         1.0       ADAIR          KY   KENTUCKY   \n",
+       "\n",
+       "   AREA_PLANTED  AREA_HARVESTED  YIELD  PRODUCTION  \n",
+       "0           0.0             0.0  110.0         0.0  \n",
+       "1           0.0             0.0  118.0         0.0  \n",
+       "2           0.0             0.0  165.3         0.0  \n",
+       "3           0.0             0.0  129.3         0.0  \n",
+       "4           0.0             0.0   81.0         0.0  "
+      ]
+     },
+     "execution_count": 15,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "# take a quick peek\n",
+    "processed_data.head()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 17,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# normalize the names to be compatible with the geographic mapping available for tableau\n",
+    "processed_data['COUNTY_NAME'] = processed_data['COUNTY_NAME'].str.title()\n",
+    "processed_data['STATE_NAME'] = processed_data['STATE_NAME'].str.title()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 20,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# store the results\n",
+    "processed_data.to_csv('processed_data.csv')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.7.3"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2
+}
